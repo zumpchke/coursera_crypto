@@ -4,15 +4,12 @@
 #include <botan/hex.h>
 #include <botan/hash.h>
 
+#define CHUNK_SIZE      (1024)
+#define HASH_SIZE       (32)
 
 struct hashed_chunk {
     uint32_t data_size;
     uint8_t *data;
-};
-
-struct overlay {
-    uint8_t data[1024];
-    uint8_t hash[32];
 };
 
 void
@@ -31,13 +28,13 @@ hash_blocks(struct hashed_chunk *chunks, size_t len, uint8_t *h0)
     while (i >= 0) {
         struct hashed_chunk *ptr = &chunks[i];
         std::unique_ptr<Botan::HashFunction> hash(Botan::HashFunction::create("SHA-256"));
-        assert(hash->output_length() == 32);
+        assert(hash->output_length() == HASH_SIZE);
         // Last block - only hash the data
         if (i == len - 1) {
             hash->update(ptr->data, ptr->data_size);
         } else {
             // Other blocks, hash the whole block
-            hash->update(ptr->data, ptr->data_size + 32);
+            hash->update(ptr->data, ptr->data_size + HASH_SIZE);
         }
         // Need to place in prev block
         auto *prev = ptr - 1;
@@ -63,52 +60,63 @@ verify_chunks(struct hashed_chunk *chunks, size_t len, uint8_t *h0) {
         if (i == len - 1) {
             hash->update(chunks[i].data, chunks[i].data_size);
         } else {
-            hash->update(chunks[i].data, chunks[i].data_size + 32);
+            hash->update(chunks[i].data, chunks[i].data_size + HASH_SIZE);
         }
         hash->final(sha);
-        assert(!memcmp(cur_hash, sha, 32));
+        assert(!memcmp(cur_hash, sha, HASH_SIZE));
         cur_hash = (uint8_t *) chunks[i].data + 1024;
     }
 }
 
-int main(int argc, char *argv[]) {
-
-    std::ifstream file;
-   // file.open("6.2.birthday.mp4_download", std::ifstream::binary);
-    file.open("6.1.intro.mp4_download", std::ifstream::binary);
-    assert(file.is_open());
-
-    file.seekg(0, std::ios_base::end);
-    auto size = file.tellg();
-    file.seekg(0, std::ios::beg);
-    auto num_chunks = size/1024 + 1;
-
-    struct hashed_chunk *chunks = (struct hashed_chunk *)malloc(sizeof(struct hashed_chunk)*num_chunks);
-    auto total_sz = 0;
-
+void build_chunks(struct hashed_chunk *chunks, size_t len, std::ifstream& file,
+        size_t file_size, uint32_t *total_sz)
+{
     size_t i = 0;
-    while (i < size/1024) {
+    while (i < file_size/CHUNK_SIZE) {
         struct hashed_chunk *chunk = &chunks[i];
-        chunk->data = (uint8_t *) malloc(sizeof(uint8_t)*(1024 + 32));
-        chunk->data_size = 1024;
-        file.read((char *) chunk->data, 1024);
-        total_sz += 1024;
+        chunk->data = (uint8_t *) malloc(sizeof(uint8_t)*(CHUNK_SIZE + 32));
+        chunk->data_size = CHUNK_SIZE;
+        file.read((char *) chunk->data, CHUNK_SIZE);
+        *total_sz += CHUNK_SIZE;
         i += 1;
     }
 
-    if (i*1024 < size) {
+    if (i*CHUNK_SIZE < file_size) {
         struct hashed_chunk *chunk = &chunks[i];
-        auto sz = size - i*1024;
-        chunk->data = (uint8_t *) malloc(sizeof(uint8_t)*(sz + 32));
+        auto sz = file_size - i*CHUNK_SIZE;
+        chunk->data = (uint8_t *) malloc(sizeof(uint8_t)*(sz + HASH_SIZE));
         chunk->data_size = sz;
         file.read((char *) chunk->data, sz);
-        total_sz += sz;
+        *total_sz += sz;
     }
+}
 
+int main(int argc, char *argv[]) {
+    std::ifstream file;
+    //file.open("6.2.birthday.mp4_download", std::ifstream::binary);
+    file.open("6.1.intro.mp4_download", std::ifstream::binary);
+    assert(file.is_open());
+
+    // Get size
+    file.seekg(0, std::ios_base::end);
+    auto size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    auto num_chunks = size/CHUNK_SIZE + 1;
+
+    struct hashed_chunk *chunks = (struct hashed_chunk *)
+        malloc(sizeof(struct hashed_chunk)*num_chunks);
+    uint32_t total_sz = 0;
+
+    build_chunks(chunks, num_chunks, file, size, &total_sz);
+    assert(total_sz == size);
+
+    // Hash all blocks from the last block (reverse direction)
     std::vector<uint8_t> h0(32);
     hash_blocks(chunks, num_chunks, h0.data());
     std::cout << "h0 = " << Botan::hex_encode(h0, false) << std::endl;
 
+    // Verify blocks in the forward direction
     verify_chunks(chunks, num_chunks, h0.data());
 
     free_chunks(chunks, num_chunks);
