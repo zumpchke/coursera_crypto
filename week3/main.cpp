@@ -29,23 +29,15 @@ hash_blocks(struct hashed_chunk *chunks, size_t len, uint8_t *h0)
     int i = len - 1;
     auto blocks = 0;
     while (i >= 0) {
-        // 
         struct hashed_chunk *ptr = &chunks[i];
         std::unique_ptr<Botan::HashFunction> hash(Botan::HashFunction::create("SHA-256"));
         assert(hash->output_length() == 32);
         // Last block - only hash the data
         if (i == len - 1) {
-            //printf("hashing %d\n", ptr->data_size);
             hash->update(ptr->data, ptr->data_size);
         } else {
             // Other blocks, hash the whole block
             hash->update(ptr->data, ptr->data_size + 32);
-
-            struct overlay *o = (struct overlay *) ptr->data;
-            //printf("prev block hash @ %p\n", (uint8_t *) o  + 1024);
-            //std::cout << Botan::hex_encode((uint8_t *) ptr->data + 1024, 32) << std::endl;
-            //assert(0);
-
         }
         // Need to place in prev block
         auto *prev = ptr - 1;
@@ -53,11 +45,8 @@ hash_blocks(struct hashed_chunk *chunks, size_t len, uint8_t *h0)
             hash->final(h0);
         } else {
             uint8_t *myptr = (uint8_t *) prev->data + prev->data_size;
-            //printf("addr of dest %p\n", myptr);
             hash->final(prev->data + prev->data_size);
-            //std::cout << Botan::hex_encode((uint8_t *) prev->data + prev->data_size, 32) << std::endl;
         }
-        //std::cout << i << std::endl;
         i--;
         blocks++;
     }
