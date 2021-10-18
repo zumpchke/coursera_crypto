@@ -81,6 +81,7 @@ void build_chunks(struct hashed_chunk *chunks, size_t len, std::ifstream& file,
         i += 1;
     }
 
+    // Remaining
     if (i*CHUNK_SIZE < file_size) {
         struct hashed_chunk *chunk = &chunks[i];
         auto sz = file_size - i*CHUNK_SIZE;
