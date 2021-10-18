@@ -43,7 +43,6 @@ my_aes_ctr_decrypt(Botan::secure_vector<uint8_t>& key, Botan::secure_vector<uint
 
         Botan::BigInt intiv(buf.data(), 16);
         intiv += 1;
-        //std::cout << intiv.to_hex_string() << std::endl;
         intiv.binary_encode(buf.data(), 16);
 
     }
@@ -57,20 +56,6 @@ my_aes_cbc_decrypt(Botan::secure_vector<uint8_t>& key, Botan::secure_vector<uint
     output.resize(ct.size() - 16);
 
     auto cipher(Botan::BlockCipher::create("AES-128"));
-
-#if 0
-    {
-    // Compare with lib
-    Botan::secure_vector<uint8_t> my_out(ct.begin()+16, ct.end());
-    auto enc(Botan::Cipher_Mode::create("AES-128/CBC/PKCS7", Botan::DECRYPTION));
-    enc->set_key(key);
-    enc->start(iv);
-    enc->finish(my_out);
-    //printf("%d\n", ct2.size());
-    std::cout << Botan::hex_encode(my_out) << std::endl;
-    //std::cout << enc->name() << "with iv "  << Botan::hex_encode(iv) << " " << Botan::hex_encode(ct2) << std::endl;
-    }
-#endif
 
     cipher->set_key(key);
 
@@ -106,25 +91,13 @@ Botan::secure_vector<uint8_t>
 my_aes_cbc_encrypt(Botan::secure_vector<uint8_t>& key, Botan::secure_vector<uint8_t>& iv, Botan::secure_vector<uint8_t>& ct) {
     auto old_size = ct.size();
     auto new_size = (ct.size() + 16) & ~(16 - 1);
-    //printf("old %d new %d\n", old_size, new_size);
+
     ct.resize(new_size, new_size - old_size);
 
     Botan::secure_vector<uint8_t> output;
     output.resize(new_size - 16);
 
     auto cipher(Botan::BlockCipher::create("AES-128"));
-
-#if 0
-    // Compare with lib
-    Botan::secure_vector<uint8_t> ct2(ct.begin()+16, ct.end() - 16);
-    auto enc(Botan::Cipher_Mode::create("AES-128/CBC/PKCS7", Botan::ENCRYPTION));
-    enc->set_key(key);
-    enc->start(iv);
-    enc->finish(ct2);
-    printf("%d\n", ct2.size());
-    std::cout << Botan::hex_encode(ct2) << std::endl;
-    //std::cout << enc->name() << "with iv "  << Botan::hex_encode(iv) << " " << Botan::hex_encode(ct2) << std::endl;
-#endif
 
     cipher->set_key(key);
 
@@ -136,16 +109,6 @@ my_aes_cbc_encrypt(Botan::secure_vector<uint8_t>& key, Botan::secure_vector<uint
         if (i > 0) {
             prev = out - 16;
         }
-#if 0
-        std::transform(it, it+16, prev, prev+16, [](auto v1, auto v2) {
-            return (v1 ^ v2);
-        });
-
-        for (auto j =it; j < it + 16; j++) {
-            printf("%x ", *j);
-        }
-        printf("\n");
-#endif
 
         for (auto ii = it; ii < it + 16; ii++) {
             *ii ^= *prev;
@@ -171,11 +134,6 @@ int main() {
 
         auto output = my_aes_cbc_decrypt(key, iv, ct);
 
-        //std::cout << Botan::hex_encode(output, false) << std::endl;
-        //for(int i = 0; i < output.size(); i++ ){
-            //printf("%s", (const char *) output.data());
-        //}
-        //printf("\n");
         print_vector(output);
     }
 
@@ -188,8 +146,6 @@ int main() {
 
         auto output = my_aes_cbc_decrypt(key, iv, ct);
 
-        //std::cout << Botan::hex_encode(output, false) << std::endl;
-        //printf("%s", (const char *) output.data());
         print_vector(output);
     }
 
@@ -202,8 +158,6 @@ int main() {
 
         auto output = my_aes_ctr_decrypt(key, iv, ct);
 
-        //std::cout << Botan::hex_encode(output, false) << std::endl;
-        //printf("%s\n", (const char *) output.data());
         print_vector(output);
 
     }
@@ -217,8 +171,7 @@ int main() {
 
         auto output = my_aes_ctr_decrypt(key, iv, ct);
 
-        printf("%s\n", (const char *) output.data());
-        //std::cout << Botan::hex_encode(output, false) << std::endl;
+        print_vector(output);
     }
 
 
